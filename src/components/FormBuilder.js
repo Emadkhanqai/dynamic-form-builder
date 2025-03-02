@@ -24,7 +24,6 @@ const FormBuilder = () => {
   const [versionId, setVersionId] = useState("");
   const [editingParent, setEditingParent] = useState(false);
 
-  
   // Add this function to handle version change
   const handleVersionChange = (newVersionId) => {
     setVersionId(newVersionId);
@@ -41,42 +40,129 @@ const FormBuilder = () => {
   };
 
   // Load existing form configuration if available
-  useEffect(() => {
-    const loadFormConfiguration = async () => {
-      setIsLoading(true);
-      setError(null);
+  // useEffect(() => {
+  //   const loadFormConfiguration = async () => {
+  //     setIsLoading(true);
+  //     setError(null);
 
-      try {
-        // Attempt to load configuration from API
-        const formData = await apiService.getDynamicForm();
-        if (formData && formData.length > 0) {
-          // Transform API data to component state format
-          const transformedFields = transformApiDataToFields(formData);
-          setFields(transformedFields);
+  //     try {
+  //       // Attempt to load configuration from API
+  //       const formData = await apiService.getDynamicForm();
+  //       if (formData && formData.length > 0) {
+  //         // Transform API data to component state format
+  //         const transformedFields = transformApiDataToFields(formData);
+  //         setFields(transformedFields);
 
-          // Expand all top-level fields by default
-          const expanded = {};
-          transformedFields.forEach((field) => {
-            expanded[field.id] = true;
-          });
-          setExpandedFields(expanded);
-        }
-      } catch (error) {
-        console.error("Error loading form configuration:", error);
-        setError("Failed to load form configuration. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  //         // Expand all top-level fields by default
+  //         const expanded = {};
+  //         transformedFields.forEach((field) => {
+  //           expanded[field.id] = true;
+  //         });
+  //         setExpandedFields(expanded);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error loading form configuration:", error);
+  //       setError("Failed to load form configuration. Please try again.");
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
 
-    loadFormConfiguration();
-  }, []);
+  //   loadFormConfiguration();
+  // }, []);
 
   // Transform API data to component state format
   const transformApiDataToFields = (apiData) => {
     return apiData.map((item) => transformApiItem(item));
   };
 
+  // Add a sibling field
+const addSiblingField = (parentId, fieldType) => {
+  if (!parentId) {
+    // If no parent, add a top-level field
+    addField();
+    return;
+  }
+  
+  // Add a new field to the same parent
+  const newField = {
+    id: uuidv4(),
+    values: {
+      ...getDefaultFieldValues(),
+      fieldType: fieldType || '' // Inherit field type from sibling if available
+    },
+    childSections: []
+  };
+  
+  updateFieldsRecursively(fields, parentId, (field) => {
+    field.childSections = [...(field.childSections || []), newField];
+    return field;
+  });
+  
+  // Select the new field for editing
+  setSelectedField(newField);
+  setIsNewField(true);
+  setShowFieldModal(true);
+  
+  // Expand the parent field
+  setExpandedFields({
+    ...expandedFields,
+    [parentId]: true
+  });
+};
+
+// Clone a field and all its children
+const cloneField = (id) => {
+  const originalField = findField(id);
+  if (!originalField) return;
+  
+  // Create a deep clone of the field and its children
+  const cloneFieldDeep = (field) => {
+    const clonedField = {
+      id: uuidv4(), // Generate new ID
+      values: { ...field.values }, // Clone values
+      childSections: field.childSections ? 
+        field.childSections.map(child => cloneFieldDeep(child)) : [] // Clone children recursively
+    };
+    return clonedField;
+  };
+  
+  const clonedField = cloneFieldDeep(originalField);
+  
+  // Find parent of the original field
+  const parentField = findParentField(id);
+  
+  if (!parentField) {
+    // Original is a top-level field
+    setFields([...fields, clonedField]);
+  } else {
+    // Original is a child field, add clone to same parent
+    updateFieldsRecursively(fields, parentField.id, (field) => {
+      field.childSections = [...field.childSections, clonedField];
+      return field;
+    });
+    
+    // Expand the parent
+    setExpandedFields({
+      ...expandedFields,
+      [parentField.id]: true
+    });
+  }
+  
+  // Expand the cloned field by default if it has children
+  if (clonedField.childSections && clonedField.childSections.length > 0) {
+    setExpandedFields({
+      ...expandedFields,
+      [clonedField.id]: true
+    });
+  }
+  
+  // Show success message
+  setSuccessMessage("Field cloned successfully!");
+  setTimeout(() => {
+    setSuccessMessage(null);
+  }, 3000);
+};
   // Recursive function to transform an API item to field format
   const transformApiItem = (item) => {
     const field = {
@@ -230,11 +316,11 @@ const FormBuilder = () => {
   // Save parent field from ParentFieldModal
   const saveParentField = (values) => {
     console.log("Saving parent field with values:", values);
-  
+
     if (editingParent && selectedField) {
       // We're editing an existing parent field
       console.log("Updating existing parent field:", selectedField.id);
-      
+
       // Update the existing field's values
       updateFieldsRecursively(fields, selectedField.id, (field) => {
         field.values = {
@@ -246,11 +332,11 @@ const FormBuilder = () => {
           pageButtonTitle: values.pageButtonTitle,
           allowSubmission: values.allowSubmission || false,
           pageBreak: values.pageBreak || false,
-          helperTextCode: values.helperTextCode || values.code
+          helperTextCode: values.helperTextCode || values.code,
         };
         return field;
       });
-      
+
       // Show success message
       setSuccessMessage("Parent field updated successfully!");
     } else {
@@ -273,39 +359,42 @@ const FormBuilder = () => {
         },
         childSections: [],
       };
-  
+
       if (!selectedParentId) {
         // Add as a top-level parent
         setFields([...fields, newParentField]);
       } else {
         // Add as a nested parent
         updateFieldsRecursively(fields, selectedParentId, (field) => {
-          field.childSections = [...(field.childSections || []), newParentField];
+          field.childSections = [
+            ...(field.childSections || []),
+            newParentField,
+          ];
           return field;
         });
-  
+
         // Expand the parent field
         setExpandedFields({
           ...expandedFields,
           [selectedParentId]: true,
         });
       }
-  
+
       // Expand the new parent field by default
       setExpandedFields({
         ...expandedFields,
         [newParentField.id]: true,
       });
-  
+
       // Show success message
       setSuccessMessage("Parent field added successfully!");
     }
-  
+
     // Clear states
     setSelectedField(null);
     setEditingParent(false);
     setSelectedParentId(null);
-    
+
     // Clear success message after timeout
     setTimeout(() => {
       setSuccessMessage(null);
@@ -313,32 +402,33 @@ const FormBuilder = () => {
   };
 
   // Edit a field
-// Modify the editField function to identify if we're editing a parent field
-const editField = (id) => {
-  const field = findField(id);
-  if (field) {
-    // Set the selected field first
-    setSelectedField(field);
-    
-    // Check if this is a parent field (header or accordion)
-    const isParentField = field.values?.fieldType === 'header' || field.values?.fieldType === 'accordion';
-    
-    if (isParentField) {
-      // For parent fields, use the parent field modal
-      setEditingParent(true);
-      setIsNewField(false); // Not a new field since we're editing
-      setShowParentModal(true);
-      setShowFieldModal(false); // Ensure the other modal is closed
-    } else {
-      // For regular fields, use the field attributes modal
-      setEditingParent(false);
-      setIsNewField(false);
-      setShowFieldModal(true);
-      setShowParentModal(false); // Ensure the other modal is closed
-    }
-  }
-};
+  // Modify the editField function to identify if we're editing a parent field
+  const editField = (id) => {
+    const field = findField(id);
+    if (field) {
+      // Set the selected field first
+      setSelectedField(field);
 
+      // Check if this is a parent field (header or accordion)
+      const isParentField =
+        field.values?.fieldType === "header" ||
+        field.values?.fieldType === "accordion";
+
+      if (isParentField) {
+        // For parent fields, use the parent field modal
+        setEditingParent(true);
+        setIsNewField(false); // Not a new field since we're editing
+        setShowParentModal(true);
+        setShowFieldModal(false); // Ensure the other modal is closed
+      } else {
+        // For regular fields, use the field attributes modal
+        setEditingParent(false);
+        setIsNewField(false);
+        setShowFieldModal(true);
+        setShowParentModal(false); // Ensure the other modal is closed
+      }
+    }
+  };
 
   // Save field changes
   const saveField = (values) => {
@@ -417,18 +507,79 @@ const editField = (id) => {
     });
   };
 
-  // Move a field up in the order
+  // Updated moveFieldUp and moveFieldDown functions to properly maintain parent-child relationships
+
+  // Move a field up in the order with improved parent-child handling
   const moveFieldUp = (id) => {
+    // First, find the direct parent of the field
     const parent = findParentField(id);
+    // Get the array that contains this field (either top-level fields or parent's children)
     const fieldsArray = parent ? parent.childSections : fields;
+    // Find the position of the field in that array
     const index = fieldsArray.findIndex((field) => field.id === id);
 
     if (index > 0) {
       const newFieldsArray = [...fieldsArray];
-      [newFieldsArray[index - 1], newFieldsArray[index]] = [
-        newFieldsArray[index],
-        newFieldsArray[index - 1],
+
+      // Special handling for moving parent field up
+      const isMovingFieldParent =
+        newFieldsArray[index].values?.fieldType === "header" ||
+        newFieldsArray[index].values?.fieldType === "accordion";
+
+      const isPreviousFieldParent =
+        newFieldsArray[index - 1].values?.fieldType === "header" ||
+        newFieldsArray[index - 1].values?.fieldType === "accordion";
+
+      // If we're moving a parent up and the previous item is NOT a parent
+      if (isMovingFieldParent && !isPreviousFieldParent) {
+        // Find the parent of the previous item
+        const previousItemParent = findParentField(
+          newFieldsArray[index - 1].id
+        );
+
+        // If previous item has a different parent
+        if (previousItemParent && previousItemParent.id !== parent?.id) {
+          // Update that previous item's parent by removing it from its parent's children
+          updateFieldsRecursively(fields, previousItemParent.id, (field) => {
+            field.childSections = field.childSections.filter(
+              (child) => child.id !== newFieldsArray[index - 1].id
+            );
+            return field;
+          });
+
+          // Add the previous item to the moving parent's children
+          newFieldsArray[index].childSections.push(newFieldsArray[index - 1]);
+
+          // Remove the previous item from this level
+          newFieldsArray.splice(index - 1, 1);
+
+          // Now update parent or top-level fields
+          if (parent) {
+            updateFieldsRecursively(fields, parent.id, (field) => {
+              field.childSections = newFieldsArray;
+              return field;
+            });
+          } else {
+            setFields(newFieldsArray);
+          }
+
+          return;
+        }
+      }
+
+      // Regular case - just swap positions but preserve children
+      const fieldChildren = [...(newFieldsArray[index].childSections || [])];
+      const prevFieldChildren = [
+        ...(newFieldsArray[index - 1].childSections || []),
       ];
+
+      [newFieldsArray[index - 1], newFieldsArray[index]] = [
+        { ...newFieldsArray[index] },
+        { ...newFieldsArray[index - 1] },
+      ];
+
+      newFieldsArray[index - 1].childSections = fieldChildren;
+      newFieldsArray[index].childSections = prevFieldChildren;
 
       if (!parent) {
         setFields(newFieldsArray);
@@ -441,18 +592,75 @@ const editField = (id) => {
     }
   };
 
-  // Move a field down in the order
+  // Move a field down in the order with improved parent-child handling
   const moveFieldDown = (id) => {
+    // First, find the direct parent of the field
     const parent = findParentField(id);
+    // Get the array that contains this field (either top-level fields or parent's children)
     const fieldsArray = parent ? parent.childSections : fields;
+    // Find the position of the field in that array
     const index = fieldsArray.findIndex((field) => field.id === id);
 
     if (index < fieldsArray.length - 1) {
       const newFieldsArray = [...fieldsArray];
-      [newFieldsArray[index], newFieldsArray[index + 1]] = [
-        newFieldsArray[index + 1],
-        newFieldsArray[index],
+
+      // Special handling for moving parent field down
+      const isMovingFieldParent =
+        newFieldsArray[index].values?.fieldType === "header" ||
+        newFieldsArray[index].values?.fieldType === "accordion";
+
+      const isNextFieldParent =
+        newFieldsArray[index + 1].values?.fieldType === "header" ||
+        newFieldsArray[index + 1].values?.fieldType === "accordion";
+
+      // If we're moving a parent down and the next item is NOT a parent
+      if (isMovingFieldParent && !isNextFieldParent) {
+        // Find the parent of the next item
+        const nextItemParent = findParentField(newFieldsArray[index + 1].id);
+
+        // If next item has a different parent
+        if (nextItemParent && nextItemParent.id !== parent?.id) {
+          // Update that next item's parent by removing it from its parent's children
+          updateFieldsRecursively(fields, nextItemParent.id, (field) => {
+            field.childSections = field.childSections.filter(
+              (child) => child.id !== newFieldsArray[index + 1].id
+            );
+            return field;
+          });
+
+          // Add the next item to the moving parent's children
+          newFieldsArray[index].childSections.push(newFieldsArray[index + 1]);
+
+          // Remove the next item from this level
+          newFieldsArray.splice(index + 1, 1);
+
+          // Now update parent or top-level fields
+          if (parent) {
+            updateFieldsRecursively(fields, parent.id, (field) => {
+              field.childSections = newFieldsArray;
+              return field;
+            });
+          } else {
+            setFields(newFieldsArray);
+          }
+
+          return;
+        }
+      }
+
+      // Regular case - just swap positions but preserve children
+      const fieldChildren = [...(newFieldsArray[index].childSections || [])];
+      const nextFieldChildren = [
+        ...(newFieldsArray[index + 1].childSections || []),
       ];
+
+      [newFieldsArray[index], newFieldsArray[index + 1]] = [
+        { ...newFieldsArray[index + 1] },
+        { ...newFieldsArray[index] },
+      ];
+
+      newFieldsArray[index].childSections = nextFieldChildren;
+      newFieldsArray[index + 1].childSections = fieldChildren;
 
       if (!parent) {
         setFields(newFieldsArray);
@@ -464,7 +672,6 @@ const editField = (id) => {
       }
     }
   };
-
   // Move a field to a new parent (drag and drop)
   const moveField = (sourceId, targetId) => {
     const sourceField = findField(sourceId);
@@ -597,34 +804,49 @@ const editField = (id) => {
   };
 
   // Render fields recursively
-  const renderFields = (fieldsArray, level = 0) => {
-    return fieldsArray.map((field) => (
-      <React.Fragment key={field.id}>
-        <DraggableField
-          id={field.id}
-          index={fieldsArray.indexOf(field)}
-          moveField={moveField}
-          field={field}
-          level={level}
-          onEdit={editField}
-          onDelete={deleteField}
-          onAddChild={addChildField}
-          onAddChildParent={addChildParent}
-          onMoveUp={moveFieldUp}
-          onMoveDown={moveFieldDown}
-          isExpanded={expandedFields[field.id]}
-          toggleExpand={toggleExpand}
-        />
+  const renderFields = (fieldsArray, level = 0, parentId = null) => {
+    return fieldsArray.map((field) => {
+      // Check if this is a parent field
+      const isParentField =
+        field.values?.fieldType === "header" ||
+        field.values?.fieldType === "accordion";
 
-        {expandedFields[field.id] &&
-          field.childSections &&
-          field.childSections.length > 0 && (
+      // Child fields that come immediately after a parent should be visually indented
+      const shouldIndent = isParentField || parentId !== null;
+
+      // For parent fields, we'll render their children indented under them
+      const hasChildren = field.childSections && field.childSections.length > 0;
+
+      return (
+        <React.Fragment key={field.id}>
+          <DraggableField
+            id={field.id}
+            index={fieldsArray.indexOf(field)}
+            moveField={moveField}
+            field={field}
+            level={shouldIndent ? level : 0} // Only indent if this is a parent or under a parent
+            onEdit={editField}
+            onDelete={deleteField}
+            onAddChild={addChildField}
+            onAddChildParent={addChildParent}
+            onAddSibling={addSiblingField}
+            onClone={cloneField}
+            onMoveUp={moveFieldUp}
+            onMoveDown={moveFieldDown}
+            isExpanded={expandedFields[field.id]}
+            toggleExpand={toggleExpand}
+            parentId={parentId}
+          />
+
+          {/* For parent fields with children, render their children indented */}
+          {isParentField && hasChildren && expandedFields[field.id] && (
             <div className="ms-4">
-              {renderFields(field.childSections, level + 1)}
+              {renderFields(field.childSections, level + 1, field.id)}
             </div>
           )}
-      </React.Fragment>
-    ));
+        </React.Fragment>
+      );
+    });
   };
 
   // Render content area with actions inside the form area
@@ -727,15 +949,7 @@ const editField = (id) => {
                 )}
               </Button>
             )}
-            {process.env.NODE_ENV === "development" && (
-              <Button
-                variant="outline-secondary"
-                className="ms-2"
-                onClick={debugState}
-              >
-                Debug
-              </Button>
-            )}
+         
           </Col>
         </Row>
 
@@ -757,21 +971,21 @@ const editField = (id) => {
         />
       )}
 
-{showParentModal && (
-  <ParentFieldModal
-    show={showParentModal}
-    onHide={() => {
-      setShowParentModal(false);
-      setSelectedField(null);
-      setEditingParent(false);
-      setSelectedParentId(null);
-    }}
-    field={editingParent ? selectedField : null}
-    onSave={saveParentField}
-    isNew={!editingParent}
-    parentVersionId={versionId}
-  />
-)}
+      {showParentModal && (
+        <ParentFieldModal
+          show={showParentModal}
+          onHide={() => {
+            setShowParentModal(false);
+            setSelectedField(null);
+            setEditingParent(false);
+            setSelectedParentId(null);
+          }}
+          field={editingParent ? selectedField : null}
+          onSave={saveParentField}
+          isNew={!editingParent}
+          parentVersionId={versionId}
+        />
+      )}
     </DndProvider>
   );
 };

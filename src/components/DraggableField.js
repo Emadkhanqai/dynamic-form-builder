@@ -21,24 +21,34 @@ const DraggableField = ({
   onMoveDown,
   isExpanded,
   toggleExpand,
+  parentId = null,
+  onAddSibling = null,
+  onClone = null
 }) => {
   const ref = useRef(null);
 
-  // Implement drag functionality
+  // Determine if this is a parent field (header or accordion)
+  const isParentField =
+    field.values?.fieldType === "header" ||
+    field.values?.fieldType === "accordion";
+
+  // Only allow parent fields to be dragged
   const [{ isDragging }, drag] = useDrag({
     type: ItemTypes.FIELD,
     item: { id, index, level },
+    canDrag: isParentField, // Only parent fields can be dragged
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   });
 
-  // Implement drop functionality
+  // Only allow parent fields to receive drops
   const [{ isOver, canDrop }, drop] = useDrop({
     accept: ItemTypes.FIELD,
     canDrop: (item) => {
-      // Prevent dropping on itself or its children
-      return item.id !== id && !isChildOf(item.id, field);
+      // Only parent fields can receive drops and
+      // prevent dropping on itself or its children
+      return isParentField && item.id !== id && !isChildOf(item.id, field);
     },
     drop: (item) => {
       // Handle the drop action
@@ -52,8 +62,13 @@ const DraggableField = ({
     }),
   });
 
-  // Attach both drag and drop refs to the component
-  drag(drop(ref));
+  // Attach both drag and drop refs to the component only if it's a parent
+  if (isParentField) {
+    drag(drop(ref));
+  } else {
+    // Only use ref for non-parent fields (not draggable)
+    ref.current = ref.current;
+  }
 
   // Helper function to check if a field is a child of another field
   const isChildOf = (fieldId, parentField) => {
@@ -66,10 +81,20 @@ const DraggableField = ({
     );
   };
 
-  // Determine if this is a parent field (header or accordion)
-  const isParentField =
-    field.values?.fieldType === "header" ||
-    field.values?.fieldType === "accordion";
+  // Get the display name from the code (simulating translation)
+  const getDisplayName = (code) => {
+    // This would normally be a lookup to get the translated value
+    // For now, just display the code with prettier formatting
+    if (!code) return "New Field";
+    
+    // Convert codes like "en_US" to "English (US)"
+    if (code === "en_US") return "English (US)";
+    if (code === "fr_FR") return "French (France)";
+    if (code === "es_ES") return "Spanish (Spain)";
+    
+    // For other codes, just make it look nicer
+    return code.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
 
   // Styling for different field types
   const getCardStyle = (isParentField) => {
@@ -98,8 +123,9 @@ const DraggableField = ({
       <Card
         style={{
           ...getCardStyle(isParentField),
-          opacity: opacityValue, // Fixed: use opacityValue instead of undefined opacity
+          opacity: opacityValue,
           borderStyle: isOver && canDrop ? "2px dashed #4682b4" : undefined,
+          cursor: isParentField ? "move" : "default",
         }}
       >
         <Card.Header className={isParentField ? "bg-light" : ""}>
@@ -117,8 +143,8 @@ const DraggableField = ({
                     Parent
                   </Badge>
                 )}
-                {field.values?.code || "New Field"}
-                {field.values?.fieldCode && ` - ${field.values.fieldCode}`}
+                {getDisplayName(field.values?.code)}
+                {field.values?.fieldCode && ` - ${getDisplayName(field.values.fieldCode)}`}
               </div>
               <div className="text-muted small">
                 Type: {field.values?.fieldType || "Not Set"}
@@ -155,15 +181,28 @@ const DraggableField = ({
                 Edit
               </Button>
 
-              <ButtonGroup size="sm" className="me-1">
+              {onClone && (
                 <Button
-                  variant={isParentField ? "outline-info" : "outline-success"}
-                  onClick={() => onAddChild(id)}
-                  title="Add Child Field"
+                  variant="outline-warning"
+                  size="sm"
+                  className="me-1"
+                  onClick={() => onClone(id)}
+                  title="Clone this field and all its children"
                 >
-                  + Field
+                  Clone
                 </Button>
-                {isParentField && (
+              )}
+
+              {isParentField ? (
+                // For parent fields - show buttons to add fields and child parents
+                <ButtonGroup size="sm" className="me-1">
+                  <Button
+                    variant="outline-success"
+                    onClick={() => onAddChild(id)}
+                    title="Add Child Field"
+                  >
+                    + Field
+                  </Button>
                   <Button
                     variant="outline-info"
                     onClick={() => onAddChildParent(id)}
@@ -171,8 +210,21 @@ const DraggableField = ({
                   >
                     + Parent
                   </Button>
-                )}
-              </ButtonGroup>
+                </ButtonGroup>
+              ) : (
+                // For child fields - only add sibling if the function is provided
+                onAddSibling && (
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    className="me-1"
+                    onClick={() => onAddSibling(parentId, field.values?.fieldType)}
+                    title="Add Sibling Field"
+                  >
+                    + Field
+                  </Button>
+                )
+              )}
 
               <Button
                 variant="outline-danger"

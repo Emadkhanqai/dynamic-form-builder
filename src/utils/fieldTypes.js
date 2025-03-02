@@ -91,6 +91,15 @@ export const FIELD_DEFINITIONS = [
     required: false
   },
   {
+    id: 'DisplayWorkflowGroup',
+    label: 'Display Workflow Group',
+    jsonProperty: 'DisplayWorkflowGroupId',
+    type: FIELD_TYPES.DROPDOWN,
+    description: 'Selected from lookup and mapped.',
+    dataSource: 'Lookup (Workflow Group)',
+    required: false
+  },
+  {
     id: 'isRtl',
     label: 'IsRTL',
     jsonProperty: 'IsRtl',
@@ -261,31 +270,28 @@ export const FIELD_DEFINITIONS = [
 export const FIELD_GROUPS = [
   {
     name: 'Basic Information',
-    fields: ['code', 'entity', 'fieldCode', 'sortOrder', 'fieldType']
+    fields: ['code', 'entity', 'fieldCode', 'sortOrder', 'fieldType', 'lookupSourceMapping' ,'defaultValue']
   },
   {
     name: 'Validation',
-    fields: ['customValidation', 'required']
+    fields: ['customValidation']
   },
   {
     name: 'UI Elements',
-    fields: ['placeholder', 'guideUrl', 'guideUrlMode', 'guideUrlType', 'helperTextCode', 'isRtl', 'display', 'enabled']
+    fields: ['placeholder', 'guideUrl', 'guideUrlMode', 'guideUrlType', 'helperTextCode', 'isRtl', 'display', 'enabled', 'required']
   },
   {
     name: 'Question Settings',
-    fields: ['question', 'isDynamicQuestion', 'lookupSourceMapping']
+    fields: ['question', 'isDynamicQuestion']
   },
   {
     name: 'Workflow',
     fields: ['canTriggerWorkflow', 'displayWorkflowGroup']
   },
-  {
-    name: 'Page Settings',
-    fields: ['pageTitle', 'pageButtonTitle', 'pageBreak', 'allowSubmission']
-  },
+  
   {
     name: 'Advanced',
-    fields: ['versionId', 'dropdownDependency', 'defaultValue']
+    fields: ['versionId', 'dropdownDependency']
   }
 ];
 
