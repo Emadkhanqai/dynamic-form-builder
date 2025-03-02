@@ -1,3 +1,4 @@
+/* src/index.css */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,9 +6,64 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Drag and Drop Styling */
+.dragging {
+  opacity: 0.5;
+}
+
+.can-drop {
+  border: 2px dashed #007bff !important;
+  background-color: rgba(0, 123, 255, 0.1) !important;
+}
+
+/* Nested fields styling */
+.nested-fields {
+  margin-left: 20px;
+  border-left: 2px solid #dee2e6;
+  padding-left: 10px;
+}
+
+/* Field card styling */
+.card {
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Form field grouping */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+/* Tab styling */
+.nav-tabs .nav-link {
+  color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+  font-weight: 500;
+  color: #007bff;
+}
+
+/* Button spacing */
+.btn {
+  margin-right: 0.25rem;
+}
+
+/* Loading spinner */
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
 }
